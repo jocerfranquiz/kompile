@@ -1,0 +1,100 @@
+#!/bin/bash
+
+# Kompile - Smart C compiler wrapper
+
+# Copyright (C) 2025 @jocerfranquiz
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+# Load configuration
+CONFIG_FILES=(
+    "$(dirname "$0")/kompile.conf"  # Local config
+    "$HOME/.config/kompile.conf"    # User config
+)
+
+for config in "${CONFIG_FILES[@]}"; do
+    if [ -f "$config" ]; then
+        # Read KEY=VALUE pairs
+        while IFS='=' read -r key value; do
+            # Skip comments and empty lines
+            [[ "$key" =~ ^# ]] || [[ -z "$key" ]] && continue
+            # Remove surrounding quotes if present
+            value="${value%\"}"
+            value="${value#\"}"
+            declare "$key"="$value"
+        done < "$config"
+        break
+    fi
+done
+
+# Usage message
+usage() {
+    echo "Usage: kompile [options] <source_file.c> [output_name]"
+    echo "Options:"
+    echo "  -c    Compile only (do not execute)"
+    echo "  -l    Use clang instead of default compiler"
+    echo "  -h    Show this help message"
+}
+
+# Parse options
+EXECUTE=${DEFAULT_EXECUTE:-1}
+COMPILER=${DEFAULT_COMPILER:-cc}
+while getopts "clh" opt; do
+    case $opt in
+        c) EXECUTE=0 ;;
+        l) COMPILER=${CLANG_COMPILER:-clang} ;;
+        h) usage; exit 0 ;;
+        *) usage; exit 1 ;;
+    esac
+done
+shift $((OPTIND - 1))
+
+# Check source file
+if [ $# -eq 0 ]; then
+    usage
+    exit 1
+fi
+
+# Prepare flags array
+IFS=',' read -ra COMMON_FLAGS <<< "${COMMON_FLAGS}"
+if [ "$COMPILER" = "clang" ]; then
+    IFS=',' read -ra SPECIFIC_FLAGS <<< "${CLANG_FLAGS}"
+else
+    IFS=',' read -ra SPECIFIC_FLAGS <<< "${CC_FLAGS}"
+fi
+COMPILATION_FLAGS=("${COMMON_FLAGS[@]}" "${SPECIFIC_FLAGS[@]}")
+
+# Set output
+SOURCE="$1"
+OUTPUT="${2:-${SOURCE%.*}}"
+if [ -n "$OUTPUT_DIR" ]; then
+    mkdir -p "$OUTPUT_DIR"
+    OUTPUT="$OUTPUT_DIR/$(basename "$OUTPUT")"
+fi
+
+# Compile
+echo "Compiling $SOURCE → $OUTPUT using $COMPILER..."
+"$COMPILER" "${COMPILATION_FLAGS[@]}" -o "$OUTPUT" "$SOURCE"
+
+if [ $? -eq 0 ]; then
+    echo "✅ Compilation successful!"
+    if [ $EXECUTE -eq 1 ]; then
+        echo "🚀 Executing $OUTPUT..."
+        echo "----------------------------------------"
+        ./"$OUTPUT"
+    fi
+else
+    echo "❌ Compilation failed."
+    exit 1
+fi
