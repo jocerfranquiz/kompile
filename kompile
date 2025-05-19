@@ -2,43 +2,53 @@
 
 # Kompile - Smart C compiler wrapper
 
-# Copyright (C) 2025 @jocerfranquiz
+# --- Debugging helper (set DEBUG=1 to enable) ---
+DEBUG=${DEBUG:-0}
+log() {
+    if [ "$DEBUG" -eq 1 ]; then
+        echo "[DEBUG] $1"
+    fi
+}
 
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-# Load configuration
+# --- Load configuration ---
 CONFIG_FILES=(
     "$(dirname "$0")/kompile.conf"  # Local config
     "$HOME/.config/kompile.conf"    # User config
 )
 
+# Default fallback flags (if config fails)
+FALLBACK_FLAGS=(-std=c99 -pedantic -Wall -Wextra -Werror -O2 -g)
+
+# Try to load config
+CONFIG_LOADED=0
 for config in "${CONFIG_FILES[@]}"; do
     if [ -f "$config" ]; then
-        # Read KEY=VALUE pairs
+        log "Found config: $config"
         while IFS='=' read -r key value; do
             # Skip comments and empty lines
             [[ "$key" =~ ^# ]] || [[ -z "$key" ]] && continue
-            # Remove surrounding quotes if present
-            value="${value%\"}"
-            value="${value#\"}"
+            
+            # Trim whitespace and quotes
+            key="${key#"${key%%[![:space:]]*}"}"   # Left trim
+            key="${key%"${key##*[![:space:]]}"}"   # Right trim
+            value="${value#\"}"                    # Remove leading quote
+            value="${value%\"}"                    # Remove trailing quote
+            value="${value#"${value%%[![:space:]]*}"}"  # Left trim
+            value="${value%"${value##*[![:space:]]}"}"  # Right trim
+
             declare "$key"="$value"
+            log "Config set: $key=$value"
         done < "$config"
+        CONFIG_LOADED=1
         break
     fi
 done
 
-# Usage message
+if [ "$CONFIG_LOADED" -eq 0 ]; then
+    log "No config found. Using fallback flags."
+fi
+
+# --- Usage message ---
 usage() {
     echo "Usage: kompile [options] <source_file.c> [output_name]"
     echo "Options:"
@@ -47,9 +57,9 @@ usage() {
     echo "  -h    Show this help message"
 }
 
-# Parse options
+# --- Parse options ---
 EXECUTE=${DEFAULT_EXECUTE:-1}
-COMPILER=${DEFAULT_COMPILER:-cc}
+COMPILER=${DEFAULT_COMPILER:-gcc}
 while getopts "clh" opt; do
     case $opt in
         c) EXECUTE=0 ;;
@@ -60,22 +70,33 @@ while getopts "clh" opt; do
 done
 shift $((OPTIND - 1))
 
-# Check source file
+# --- Check compiler availability (gcc/clang) ---
+if ! command -v "$COMPILER" > /dev/null; then
+    echo "Error: $COMPILER not found."
+    exit 1
+fi
+
+# --- Check source file ---
 if [ $# -eq 0 ]; then
     usage
     exit 1
 fi
 
-# Prepare flags array
-IFS=',' read -ra COMMON_FLAGS <<< "${COMMON_FLAGS}"
-if [ "$COMPILER" = "clang" ]; then
-    IFS=',' read -ra SPECIFIC_FLAGS <<< "${CLANG_FLAGS}"
+# --- Prepare flags ---
+if [ "$CONFIG_LOADED" -eq 1 ]; then
+    IFS=',' read -ra COMMON_FLAGS <<< "${COMMON_FLAGS:-}"
+    if [ "$COMPILER" = "clang" ]; then
+        IFS=',' read -ra SPECIFIC_FLAGS <<< "${CLANG_FLAGS:-}"
+    else
+        IFS=',' read -ra SPECIFIC_FLAGS <<< "${GCC_FLAGS:-}"
+    fi
+    COMPILATION_FLAGS=("${COMMON_FLAGS[@]}" "${SPECIFIC_FLAGS[@]}")
 else
-    IFS=',' read -ra SPECIFIC_FLAGS <<< "${CC_FLAGS}"
+    log "Using fallback flags: ${FALLBACK_FLAGS[*]}"
+    COMPILATION_FLAGS=("${FALLBACK_FLAGS[@]}")
 fi
-COMPILATION_FLAGS=("${COMMON_FLAGS[@]}" "${SPECIFIC_FLAGS[@]}")
 
-# Set output
+# --- Set output ---
 SOURCE="$1"
 OUTPUT="${2:-${SOURCE%.*}}"
 if [ -n "$OUTPUT_DIR" ]; then
@@ -83,8 +104,14 @@ if [ -n "$OUTPUT_DIR" ]; then
     OUTPUT="$OUTPUT_DIR/$(basename "$OUTPUT")"
 fi
 
-# Compile
-echo "Compiling $SOURCE → $OUTPUT using $COMPILER..."
+# --- Debug output ---
+log "Compiler: $COMPILER"
+log "Flags: ${COMPILATION_FLAGS[*]}"
+log "Source: $SOURCE"
+log "Output: $OUTPUT"
+
+# --- Compile ---
+echo "🔧 Compiling $SOURCE → $OUTPUT using $COMPILER..."
 "$COMPILER" "${COMPILATION_FLAGS[@]}" -o "$OUTPUT" "$SOURCE"
 
 if [ $? -eq 0 ]; then
@@ -92,7 +119,7 @@ if [ $? -eq 0 ]; then
     if [ $EXECUTE -eq 1 ]; then
         echo "🚀 Executing $OUTPUT..."
         echo "----------------------------------------"
-        ./"$OUTPUT"
+        "$OUTPUT"
     fi
 else
     echo "❌ Compilation failed."
