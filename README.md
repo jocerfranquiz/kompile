@@ -102,7 +102,8 @@ kompile program.c myapp
 ## 📝 License
 
 This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](https://raw.githubusercontent.com/jocerfranquiz/kompile/refs/heads/main/LICENSE) file for details.
+
 ---
 
 💡 **Pro Tip**: Add `kompile` to your shell aliases for even faster development!
-```
+
