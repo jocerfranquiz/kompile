@@ -11,6 +11,8 @@ A minimalist C compiler wrapper with auto-execution that enforces strict compila
 - 🧠 Simple KEY=VALUE config file
 - 🐧 Pure Bash - no dependencies
 
+![Example](https://github.com/jocerfranquiz/kompile/blob/main/kompile.gif)
+
 ## 📦 Installation
 
 1. Clone the repository:
