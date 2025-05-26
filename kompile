@@ -12,7 +12,7 @@ log() {
 
 # --- Load configuration ---
 CONFIG_FILES=(
-    "$(dirname "$0")/kompile.conf"  # Local config
+    "$./kompile.conf"  # Local config
     "$HOME/.config/kompile.conf"    # User config
 )
 
