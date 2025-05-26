@@ -45,6 +45,9 @@ DEFAULT_COMPILER=gcc
 # Common flags (comma-separated)
 COMMON_FLAGS=-std=c99,-pedantic,-Wall,-Wextra,-Werror,-O2,-g
 
+# Libs
+LIB_FLAGS=-lm
+
 # Compiler-specific flags
 CC_FLAGS=-flto
 CLANG_FLAGS=-Weverything

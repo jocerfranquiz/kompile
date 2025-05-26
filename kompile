@@ -91,6 +91,9 @@ if [ "$CONFIG_LOADED" -eq 1 ]; then
         IFS=',' read -ra SPECIFIC_FLAGS <<< "${GCC_FLAGS:-}"
     fi
     COMPILATION_FLAGS=("${COMMON_FLAGS[@]}" "${SPECIFIC_FLAGS[@]}")
+
+    IFS=',' read -ra LIB_FLAGS <<< "${LIB_FLAGS:-}"
+    LIB_FLAGS=("${LIB_FLAGS[@]}")
 else
     log "Using fallback flags: ${FALLBACK_FLAGS[*]}"
     COMPILATION_FLAGS=("${FALLBACK_FLAGS[@]}")
@@ -106,13 +109,14 @@ fi
 
 # --- Debug output ---
 log "Compiler: $COMPILER"
-log "Flags: ${COMPILATION_FLAGS[*]}"
+log "Compilation Flags: ${COMPILATION_FLAGS[*]}"
+log "Lib Flags: ${LIB_FLAGS[*]}"
 log "Source: $SOURCE"
 log "Output: $OUTPUT"
 
 # --- Compile ---
 echo "🔧 Compiling $SOURCE → $OUTPUT using $COMPILER..."
-"$COMPILER" "${COMPILATION_FLAGS[@]}" -o "$OUTPUT" "$SOURCE"
+"$COMPILER" "${COMPILATION_FLAGS[@]}" -o "$OUTPUT" "$SOURCE" "${LIB_FLAGS[@]}"
 
 if [ $? -eq 0 ]; then
     echo "✅ Compilation successful!"
